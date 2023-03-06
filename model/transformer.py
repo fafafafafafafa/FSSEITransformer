@@ -57,13 +57,32 @@ class Embedding(nn.Module):
         )
 
     def forward(self, x):
+
         # [b, 2, 4800]
         x = torch.unsqueeze(x, dim=1)   # [b, 1, 2, 4800]
         x = self.feature_embedding(x)   # [b, emb_size, 1, -1]
         # print(x.shape)  # [128, 32, 1, 314]
         x = x.view(x.size(0), x.size(1), -1)    # [b, emb_size, -1] [128, 32, 314]
         x = torch.transpose(x, 1, 2)    # [b, 314, emb_size]
+
+        x = self.position_encode(x)
         return x
+
+    @staticmethod
+    def position_encode(x):
+        seq_len, emb_size = x.size(1), x.size(2)
+        pos_encoding = torch.zeros(seq_len, emb_size, requires_grad=False) # [b, 314, emb_size]
+
+        pos_mat = torch.arange(0, seq_len).unsqueeze(1).float()
+
+        _2i = torch.arange(0, emb_size, 2).unsqueeze(0).float()
+        # print(pos_mat.shape, _2i.shape)   # torch.Size([314, 1]) torch.Size([1, 16])
+        pos_encoding[:, 0::2] = torch.sin(pos_mat / torch.pow(10000, _2i / emb_size))
+        pos_encoding[:, 1::2] = torch.cos(pos_mat / torch.pow(10000, _2i / emb_size))
+        pos_encoding = torch.unsqueeze(pos_encoding, 0)
+        pos_encoding = pos_encoding.cuda()
+
+        return pos_encoding+x
 
 
 class MultiHeadAttention(nn.Module):
